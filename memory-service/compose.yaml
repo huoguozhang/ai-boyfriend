@@ -1,0 +1,20 @@
+services:
+  mem0:
+    build: .
+    image: soulmate-memory:local
+    container_name: soulmate-mem0
+    ports:
+      # 宿主 6101 → 容器 8000；主服务按 MEM0_BASE_URL=http://127.0.0.1:6101 调
+      - "6101:8000"
+    env_file:
+      - .env
+    volumes:
+      # 记忆数据（faiss 索引 + history.db）落在这里，删容器不丢
+      - ./data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 40s

@@ -1,0 +1,71 @@
+# 服务器部署：mem0 + postgres(pgvector)，全部走国内镜像源。
+#
+#   cp .env.pg.example .env      # 改 PG_PASSWORD / MEM0_API_KEY
+#   docker compose -f compose.pg.yaml up -d --build
+#   curl -s http://127.0.0.1:6101/health
+#
+# 与本地 compose.yaml 的差别只有两点：多一个 postgres、mem0 的向量库换成 pgvector。
+# 数据落在两个地方：pgdata 卷（向量 + 元数据）、./data（history.db）。
+services:
+  postgres:
+    # pgvector 官方镜像，自带 vector 扩展，不用自己编译
+    image: pgvector/pgvector:pg17
+    container_name: soulmate-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER:-mem0}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD 必填}
+      POSTGRES_DB: ${PG_DB:-mem0}
+      # 中文不指定编码时 pg 会按镜像默认 locale 建库，显式给 UTF8 最省事
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: Asia/Shanghai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 建库时自动 CREATE EXTENSION vector
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      # 绑 0.0.0.0 是为了能从外面用客户端连库；真正的闸门是云安全组
+      # —— 规则务必只放自己的出口 IP，别开 0.0.0.0/0（PG 裸奔公网必被爆破）。
+      # 不想暴露时改回 "127.0.0.1:5432:5432"，用 ssh -L 5432:127.0.0.1:5432 连。
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-mem0} -d ${PG_DB:-mem0}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  mem0:
+    build:
+      context: .
+      # 服务器 daemon 已配腾讯云加速器，docker.io 走的通，不必再套 1ms 代理
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-python:3.11-slim}
+    image: soulmate-memory:local
+    container_name: soulmate-mem0
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # 这两个必须压在 env_file 之上，避免 .env 里残留 faiss 配置把 pg 顶掉
+      MEM0_VECTOR_STORE: pgvector
+      PG_HOST: postgres
+      PG_PORT: "5432"
+    ports:
+      # 宿主 6101 → 容器 8000；server/.env 的 MEM0_BASE_URL 指向这里
+      - "6101:8000"
+    volumes:
+      # history.db（mem0 的变更史，SQLite）落这里，向量本身在 postgres
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  pgdata:

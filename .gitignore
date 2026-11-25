@@ -1,0 +1,32 @@
+# 依赖
+node_modules/
+
+# 构建产物（源码才是仓库该存的，产物由 CI/本机构建生成）
+server/target/
+front/dist/
+**/__pycache__/
+*.pyc
+
+# WorkBuddy 工作区数据（项目记忆/日志，本机私有，不进仓库）
+.workbuddy/
+
+# 运行时数据（含聊天记录、记忆、媒体、mem0 向量库）
+data/
+server/data/
+server/data-smoke/
+
+# 环境变量：真正的配置（含所有 Key）只在 .env，仓库里只留模板
+.env
+.env.*
+!.env.example
+!.env.pg.example
+
+# 日志与临时文件
+*.log
+.DS_Store
+
+# 开发自签证书（含私钥，每台机器自己 ./gen-cert.sh 生成）
+front/certs/
+
+# 端到端测试截图（跑一次生成一堆，不进仓库）
+front/e2e/shots/

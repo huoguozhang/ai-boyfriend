@@ -1,0 +1,11 @@
+# 不锁小版本：mem0ai 与 fastembed 有版本耦合，锁死容易解不开；
+# 首次 build 后会打印实际版本，需要复现时再固化到本文件。
+fastapi
+uvicorn[standard]
+mem0ai
+fastembed
+faiss-cpu
+# pgvector 后端需要：mem0 新版可能用 psycopg3、旧版用 psycopg2，两个都装，
+# 免得哪天 mem0ai 升级后 pg 连接拖到启动时才报 ImportError。
+psycopg2-binary
+psycopg[binary]

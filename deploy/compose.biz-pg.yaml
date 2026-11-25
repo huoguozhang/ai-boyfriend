@@ -1,0 +1,30 @@
+# 业务库：sessions / messages / users
+# 与本地开发环境对齐的 PostgreSQL 16；mem0 那套 pgvector 是 17，独立运行互不影响。
+# 主机端口用 5433（5432 已被 soulmate-pg 占用），并且只绑回环 —— 业务库不对外。
+name: soulmate-biz
+
+services:
+  biz-pg:
+    image: postgres:16
+    container_name: soulmate-biz-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai-soulmate
+      POSTGRES_USER: soulmate
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?请在 .env 里设置 PG_PASSWORD}
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soulmate -d ai-soulmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"

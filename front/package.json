@@ -1,0 +1,27 @@
+{
+  "name": "xiaoman-front",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "小满 · AI 数字人 Demo 前端（React + antd-mobile + Vite）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "dev:http": "VITE_NO_HTTPS=1 vite",
+    "e2e": "node e2e/ui.mjs",
+    "e2e:voice": "node e2e/voice.mjs",
+    "e2e:reminder": "node e2e/reminder.mjs"
+  },
+  "dependencies": {
+    "antd-mobile": "^5.43.0",
+    "antd-mobile-icons": "^0.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "^1.65.1",
+    "vite": "^5.4.11"
+  }
+}

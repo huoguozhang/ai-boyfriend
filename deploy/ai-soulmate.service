@@ -1,0 +1,27 @@
+[Unit]
+Description=ai-soulmate backend (Spring Boot 4 / Java 21)
+Documentation=file:///opt/soulmate/server/
+# 业务库在 docker 里，等 docker 先活起来再启动；网络同理
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# .env 由 DotEnvEnvironmentPostProcessor 从「当前工作目录」读取，所以这个目录不能改
+WorkingDirectory=/opt/soulmate/server
+Environment=JAVA_HOME=/usr/local/jdk-21
+Environment=LANG=zh_CN.UTF-8
+Environment=TZ=Asia/Shanghai
+# 3.5G 小机器，堆固定住：给系统、docker（mem0 + 两个 pg）留够余量
+ExecStart=/usr/local/jdk-21/bin/java -Xms256m -Xmx640m -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai -jar /opt/soulmate/server/app.jar
+# 崩了立刻拉起来；被 kill（143）算正常退出，不触发 restart 风暴
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+TimeoutStopSec=40
+LimitNOFILE=65535
+StandardOutput=append:/var/log/ai-soulmate/server.log
+StandardError=append:/var/log/ai-soulmate/server.log
+
+[Install]
+WantedBy=multi-user.target

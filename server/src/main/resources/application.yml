@@ -1,0 +1,136 @@
+server:
+  # 6xxx 段（8080 是本机 Nacos）
+  port: ${PORT:6100}
+
+spring:
+  application:
+    name: ai-soulmate-server
+  # 注意：这里不再用 spring.config.import 导入 .env —— 官方 properties 读取是 ISO-8859-1，
+  # .env 里的中文角色卡会变成乱码。改由 DotEnvEnvironmentPostProcessor 以 UTF-8 读取。
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  codec:
+    max-in-memory-size: 32MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  packages-to-scan: com.seeky.airuntime.controller
+
+seeky:
+  model:
+    llm:
+      enabled: ${LLM_ENABLED:true}
+      protocol: ${LLM_PROTOCOL:mock}
+      base-url: ${LLM_BASE_URL:}
+      api-key: ${LLM_API_KEY:}
+      model: ${LLM_MODEL:}
+      # 推理模型的思考过程：默认关。开着的话单次改写要 22s（实测），关掉 4s
+      thinking-enabled: ${LLM_THINKING:false}
+    asr:
+      enabled: ${ASR_ENABLED:true}
+      protocol: ${ASR_PROTOCOL:mock}
+      base-url: ${ASR_BASE_URL:}
+      api-key: ${ASR_API_KEY:}
+      model: ${ASR_MODEL:}
+    tts:
+      enabled: ${TTS_ENABLED:true}
+      protocol: ${TTS_PROTOCOL:mock}
+      base-url: ${TTS_BASE_URL:}
+      api-key: ${TTS_API_KEY:}
+      model: ${TTS_MODEL:}
+      voice: ${TTS_VOICE:}
+    image:
+      enabled: ${IMAGE_ENABLED:true}
+      protocol: ${IMAGE_PROTOCOL:mock}
+      base-url: ${IMAGE_BASE_URL:}
+      api-key: ${IMAGE_API_KEY:}
+      model: ${IMAGE_MODEL:}
+    video:
+      enabled: ${VIDEO_ENABLED:true}
+      protocol: ${VIDEO_PROTOCOL:mock}
+      base-url: ${VIDEO_BASE_URL:}
+      api-key: ${VIDEO_API_KEY:}
+      model: ${VIDEO_MODEL:}
+
+  # 语音合成的音频参数（找谁合成看上面 model.tts；合成成什么样看这里）。
+  # 接口是火山「HTTP 单向流式」：一次性发全部文本，返回换行分隔的 JSON 包（base64 音频）。
+  tts:
+    format: ${TTS_FORMAT:mp3}
+    sample-rate: ${TTS_SAMPLE_RATE:24000}
+    # 火山没有公开固定字数口径（超限返回 40402003），这里只是客户端保守上限；整段接口超了会自动切段
+    max-text-length: ${TTS_MAX_TEXT_LENGTH:600}
+    # 2.0 音色必须配 seed-tts-2.0，配成 1.0 的 id 会 45000000 音色鉴权失败
+    resource-id: ${TTS_RESOURCE_ID:seed-tts-2.0}
+    bit-rate: ${TTS_BIT_RATE:160000}
+    response-timeout: ${TTS_RESPONSE_TIMEOUT:30s}
+    overall-timeout: ${TTS_OVERALL_TIMEOUT:90s}
+
+  # 语音识别的协议参数（找谁识别看上面 model.asr）。
+  # resource-id 决定模型档位：极速版 volc.bigasr.auc_turbo / 标准版 volc.bigasr.auc
+  asr:
+    resource-id: ${ASR_RESOURCE_ID:volc.bigasr.auc_turbo}
+    user-id: ${ASR_USER_ID:soulmate}
+    timeout: ${ASR_TIMEOUT:30s}
+
+  companion:
+    name: ${PERSONA_NAME:小满}
+    age: ${PERSONA_AGE:24}
+    city: ${PERSONA_CITY:杭州}
+    job: ${PERSONA_JOB:插画师}
+    personality: ${PERSONA_PERSONALITY:嘴硬心软，嘴上嫌弃但会记住你说过的话}
+    speaking-style: ${PERSONA_SPEAKING_STYLE:短句，像微信聊天，偶尔用语气词}
+    backstory: ${PERSONA_BACKSTORY:你们认识两年了，住得不远，她有自己的工作和生活}
+    pet-name: ${PERSONA_PET_NAME:布丁}
+    voice-hint: ${PERSONA_VOICE_HINT:年轻女声，语速稍快，带一点懒散}
+    prefs:
+      receive-mode: ${CHAT_RECEIVE_MODE:both}
+      auto-play: ${CHAT_AUTO_PLAY:true}
+      proactive: ${CHAT_PROACTIVE:true}
+      history-limit: ${CHAT_HISTORY_LIMIT:24}
+
+  # 业务数据存储：本机 PostgreSQL（库名 ai-soulmate，只放 sessions / messages，记忆仍在 mem0）。
+  # 本机 pg_hba 是 trust，密码留空即可；换机器/换库只改 .env，不动代码。
+  datasource:
+    url: ${PG_URL:jdbc:postgresql://127.0.0.1:5432/ai-soulmate}
+    username: ${PG_USERNAME:postgres}
+    password: ${PG_PASSWORD:}
+    # 单用户 Demo，4 条连接足够；调大只是浪费 PG 的后端进程
+    pool-size: ${PG_POOL_SIZE:4}
+
+  # 待办提醒：用户说"三天后提醒我"就落一条到 reminders 表，到点由 ReminderScheduler 翻成待投递。
+  reminder:
+    timezone: ${REMINDER_TIMEZONE:Asia/Shanghai}
+    scan-interval-ms: ${REMINDER_SCAN_INTERVAL_MS:10000}
+
+  # 鉴权：JWT（HS256）+ 密码哈希（PBKDF2-HMAC-SHA256）。
+  # JWT_SECRET 留空也能跑（启动时随机生成），但重启会踢掉所有人，所以 .env 里配一把固定的。
+  auth:
+    jwt-secret: ${JWT_SECRET:}
+    # token 有效期（秒），默认 7 天 —— 陪伴类应用没必要让用户天天重登
+    jwt-ttl-seconds: ${JWT_TTL:604800}
+    jwt-issuer: ${JWT_ISSUER:ai-soulmate}
+    # OWASP 对 PBKDF2-HMAC-SHA256 的推荐下限是 60 万，这里取 21 万：登录一次约 60~90ms，
+    # 对本机 Demo 是速度与强度的折中；真要上线就调到 600000
+    pbkdf2-iterations: ${PBKDF2_ITERATIONS:210000}
+
+  # mem0 记忆服务（本地 docker，6101）。与 ai-runtime 同一个配置前缀 seeky.mem0，
+  # 只把「Nacos 服务发现」换成固定地址；身份维度 user_id / run_id / agent_id 不变。
+  mem0:
+    enabled: ${MEMORY_ENABLED:true}
+    base-url: ${MEM0_BASE_URL:http://127.0.0.1:6101}
+    api-key: ${MEM0_API_KEY:}
+    agent-id: ${MEM0_AGENT_ID:xiaoman}
+    search-limit: ${MEM0_SEARCH_LIMIT:8}
+    max-context-chars: ${MEM0_MAX_CONTEXT_CHARS:4096}
+    # 超时即降级：宁可这轮不带记忆，也不让回复卡在记忆上
+    response-timeout: ${MEM0_RESPONSE_TIMEOUT:5s}

@@ -1,0 +1,3 @@
+# EnvironmentPostProcessor 仍通过 spring.factories 注册（AutoConfiguration.imports 只用于自动配置类）。
+# 作用：用 UTF-8 读取 ./.env，避免官方 properties 读取按 ISO-8859-1 把中文角色卡读成乱码。
+org.springframework.boot.env.EnvironmentPostProcessor=com.seeky.airuntime.config.DotEnvEnvironmentPostProcessor
