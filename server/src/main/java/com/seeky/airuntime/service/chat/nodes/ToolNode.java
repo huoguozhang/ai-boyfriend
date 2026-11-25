@@ -15,8 +15,6 @@ import com.seeky.airuntime.service.chat.nodes.common.GraphNode;
 import com.seeky.airuntime.service.chat.nodes.common.HistoryText;
 import com.seeky.airuntime.service.chat.nodes.common.StateKeys;
 import com.seeky.airuntime.service.chat.tools.SoulmateTools;
-import com.seeky.airuntime.skill.SkillCatalog;
-import com.seeky.airuntime.skill.SkillKeys;
 import com.seeky.airuntime.store.ChatStore;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -62,17 +60,14 @@ public class ToolNode implements GraphNode {
     private final RuntimeSettings defaults;
     private final SoulmateTools tools;
     private final ChatStore store;
-    /** 技能目录：待办提醒的行为规则只有一份，工具决策与输出读同一份。 */
-    private final SkillCatalog skills;
 
     public ToolNode(LlmClient llm, PromptCatalog prompts, RuntimeSettings defaults,
-            SoulmateTools tools, ChatStore store, SkillCatalog skills) {
+            SoulmateTools tools, ChatStore store) {
         this.llm = llm;
         this.prompts = prompts;
         this.defaults = defaults;
         this.tools = tools;
         this.store = store;
-        this.skills = skills;
     }
 
     /**
@@ -194,7 +189,7 @@ public class ToolNode implements GraphNode {
         if (definitions.isEmpty()) {
             return "";
         }
-        String system = toolSystem(settings, plan);
+        String system = toolSystem(settings);
         LlmClient.ToolTurn turn = llm.withTools(
                 LlmClient.messages(system, historyOnly(state), query),
                 definitions, plan.forced(), 0.2, settings).block();
@@ -315,29 +310,20 @@ public class ToolNode implements GraphNode {
         return history.subList(Math.max(0, history.size() - HISTORY_WINDOW), history.size());
     }
 
-    private String toolSystem(EffectiveSettings settings, Plan plan) {
+    private String toolSystem(EffectiveSettings settings) {
         Map<String, Object> vars = new LinkedHashMap<>();
         vars.put("name", settings.name());
         vars.put("age", settings.age());
         vars.put("city", settings.city());
         vars.put("job", settings.job());
         vars.put("nowText", nowText());
-        String system;
         try {
-            system = prompts.render(PromptKeys.CHAT_TOOL_SYSTEM, vars);
+            return prompts.render(PromptKeys.CHAT_TOOL_SYSTEM, vars);
         } catch (RuntimeException ex) {
             // 提示词缺了不该影响对话：没有工具决策的约束，最坏也就是这一轮不调工具
             log.warn("[tool] 提示词渲染失败，本轮不做工具决策: {}", ex.getMessage());
-            system = "你是" + settings.name() + "。";
+            return "你是" + settings.name() + "。";
         }
-        // 提醒这一轮的规则直接取 SKILL.md：技能与工具用同一份规则，不会互相打脸
-        if (plan.names() != null && plan.names().contains(SoulmateTools.SET_REMINDER)) {
-            String skill = skills.content(SkillKeys.REMINDER);
-            if (!skill.isBlank()) {
-                system = system + "\n\n【本轮适用技能 " + SkillKeys.REMINDER + "】\n" + skill;
-            }
-        }
-        return system;
     }
 
     /**
